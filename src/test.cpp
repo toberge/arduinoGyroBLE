@@ -1,7 +1,6 @@
 // #include <Arduino.h>
 // #include "sensorfusion.h"
 
-
 // long previousMillis = 0;  // last timechecked, in ms
 // unsigned long micros_per_reading, micros_previous, lastUpdate;
 // float att[4];
@@ -21,5 +20,5 @@
 //     micros_now = micros();
 //     if (micros_now - micros_previous >= micros_per_reading) {
 //         getRotation(att, &lastUpdate);
-//     } 
+//     }
 // }

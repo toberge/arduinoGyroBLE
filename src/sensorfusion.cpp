@@ -1,43 +1,51 @@
 #include <Arduino.h>
-#include <Arduino_LSM9DS1.h>  // Extended 2.0 LSM9DS1 library written by Femme Verbeek, https://github.com/FemmeVerbeek/Arduino_LSM9DS1
-#include <math.h> // M_PI, sqrtf, atan2f, asinf
+#include <Arduino_LSM9DS1.h> // Extended 2.0 LSM9DS1 library written by Femme Verbeek, https://github.com/FemmeVerbeek/Arduino_LSM9DS1
+#include <math.h>            // M_PI, sqrtf, atan2f, asinf
 
-void setupSensors(){
+void setupSensors()
+{
     if (!IMU.begin())
-    { Serial.println("Failed to initialize IMU!");
-        while (1);
-    } 
+    {
+        Serial.println("Failed to initialize IMU!");
+        while (1)
+            ;
+    }
 
-    IMU.gyroUnit= RADIANSPERSECOND;   
+    IMU.gyroUnit = RADIANSPERSECOND;
     // Accelerometer code
-    IMU.setAccelFS(0); // ±2g
+    IMU.setAccelFS(0);  // ±2g
     IMU.setAccelODR(3); // 119 Hz
     IMU.setAccelOffset(0.006332, -0.009766, -0.014550);
-    IMU.setAccelSlope (0.997426, 0.992153, 1.006052);
+    IMU.setAccelSlope(0.997426, 0.992153, 1.006052);
 
     // Gyroscope code
-    IMU.setGyroFS(0); // ±245 °/s
+    IMU.setGyroFS(0);  // ±245 °/s
     IMU.setGyroODR(3); // 119 Hz
-    IMU.setGyroOffset (0.345055, 0.619925, -0.242540);
-    IMU.setGyroSlope (1.167765, 1.231580, 1.166394);
+    IMU.setGyroOffset(0.345055, 0.619925, -0.242540);
+    IMU.setGyroSlope(1.167765, 1.231580, 1.166394);
 
     // start the filter to run at the sample rate:
     float sensorRate = IMU.getGyroODR(); // The slowest ODR determines the sensor rate, Accel and Gyro share their ODR
-    Serial.print("Sensor rate: "); Serial.println(sensorRate);
+    Serial.print("Sensor rate: ");
+    Serial.println(sensorRate);
 
     delay(5000);
 
-    Serial.println("Gyro settting ");  
-    Serial.print("Gyroscope FS= ");   Serial.print(IMU.getGyroFS());
-    Serial.print("Gyroscope ODR=");   Serial.println(IMU.getGyroODR());
-    Serial.print("Gyro unit=");       Serial.println(IMU.gyroUnit);
+    Serial.println("Gyro settting ");
+    Serial.print("Gyroscope FS= ");
+    Serial.print(IMU.getGyroFS());
+    Serial.print("Gyroscope ODR=");
+    Serial.println(IMU.getGyroODR());
+    Serial.print("Gyro unit=");
+    Serial.println(IMU.gyroUnit);
 }
 
-float getSensorRate(){
+float getSensorRate()
+{
     return IMU.getGyroODR();
 }
 
-void eulerToQuat(float x, float y, float z, float* quat)
+void eulerToQuat(float x, float y, float z, float *quat)
 {
     // source: https://stackoverflow.com/questions/12088610/conversion-between-euler-quaternion-like-in-unity3d-engine
     // Expects RADIANS
@@ -53,8 +61,8 @@ void eulerToQuat(float x, float y, float z, float* quat)
     float sinPitchOver2 = (float)sin(pitchOver2);
     double rollOver2 = roll * 0.5f;
     float cosRollOver2 = (float)cos(rollOver2);
-    float sinRollOver2 = (float)sin(rollOver2);    
-    
+    float sinRollOver2 = (float)sin(rollOver2);
+
     quat[0] = sinYawOver2 * cosPitchOver2 * cosRollOver2 + cosYawOver2 * sinPitchOver2 * sinRollOver2; // x
     quat[1] = cosYawOver2 * sinPitchOver2 * cosRollOver2 - sinYawOver2 * cosPitchOver2 * sinRollOver2; // y
     quat[2] = cosYawOver2 * cosPitchOver2 * sinRollOver2 - sinYawOver2 * sinPitchOver2 * cosRollOver2; // z
@@ -62,11 +70,13 @@ void eulerToQuat(float x, float y, float z, float* quat)
 }
 
 // Simple only using the gyroscope
-void getRotation(float* att, unsigned long *lastUpdate){
-    if (!IMU.accelAvailable() || !IMU.gyroAvailable()){
+void getRotation(float *att, unsigned long *lastUpdate)
+{
+    if (!IMU.accelAvailable() || !IMU.gyroAvailable())
+    {
         return;
     }
-    static int count=0;
+    static int count = 0;
 
     // values for rotation, expects rad/sec
     float gx, gy, gz;
@@ -78,21 +88,23 @@ void getRotation(float* att, unsigned long *lastUpdate){
     // up       y       z
     // right    x       y
     float u_gx, u_gy, u_gz;
-    u_gx = -gy; u_gy = -gz; u_gz = -gx;
+    u_gx = -gy;
+    u_gy = -gz;
+    u_gz = -gx;
 
     long now = micros();
     float l = *lastUpdate;
-    float deltaT = ((now - l)/1000000.0f);
+    float deltaT = ((now - l) / 1000000.0f);
     *lastUpdate = now;
 
     float deltaG[4];
     eulerToQuat(u_gx * deltaT, u_gy * deltaT, u_gz * deltaT, deltaG);
 
     float q0, q1, q2, q3;
-    q0 = att[3] * deltaG[0] + att[0] * deltaG[3] + att[1] * deltaG[2] - att[2] * deltaG[1];  // x
-    q1 = att[3] * deltaG[1] - att[0] * deltaG[2] + att[1] * deltaG[3] + att[2] * deltaG[0];  // y
-    q2 = att[3] * deltaG[2] + att[0] * deltaG[1] - att[1] * deltaG[0] + att[2] * deltaG[3];  // z
-    q3 = att[3] * deltaG[3] - att[0] * deltaG[0] - att[1] * deltaG[1] - att[2] * deltaG[2];  // w
+    q0 = att[3] * deltaG[0] + att[0] * deltaG[3] + att[1] * deltaG[2] - att[2] * deltaG[1]; // x
+    q1 = att[3] * deltaG[1] - att[0] * deltaG[2] + att[1] * deltaG[3] + att[2] * deltaG[0]; // y
+    q2 = att[3] * deltaG[2] + att[0] * deltaG[1] - att[1] * deltaG[0] + att[2] * deltaG[3]; // z
+    q3 = att[3] * deltaG[3] - att[0] * deltaG[0] - att[1] * deltaG[1] - att[2] * deltaG[2]; // w
 
     att[0] = q0;
     att[1] = q1;
@@ -101,7 +113,7 @@ void getRotation(float* att, unsigned long *lastUpdate){
 
     // count++;
     // if (count > 20) // The optimum is probably something close to the refresh rate of your monitor.
-    // {  
+    // {
     //     count = 0;
     //     Serial.print(q0);
     //     Serial.print('\t');
@@ -116,11 +128,11 @@ void getRotation(float* att, unsigned long *lastUpdate){
     // }
 }
 
-
-
 // Expects radians per second, I think
-void getRotationComplementaryFilter(float* att, unsigned long *lastUpdate){
-    if (!IMU.accelAvailable() || !IMU.gyroAvailable()){
+void getRotationComplementaryFilter(float *att, unsigned long *lastUpdate)
+{
+    if (!IMU.accelAvailable() || !IMU.gyroAvailable())
+    {
         return;
     }
 
@@ -129,14 +141,14 @@ void getRotationComplementaryFilter(float* att, unsigned long *lastUpdate){
     float q2 = att[2];
     float q3 = att[3];
 
-    float yawAtt   = atan2(2.0f * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * 180.0f / PI;   
+    float yawAtt = atan2(2.0f * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * 180.0f / PI;
     float pitchAtt = -asin(2.0f * (q1 * q3 - q0 * q2)) * 180.0f / PI;
-    float rollAtt  = atan2(2.0f * (q0 * q1 + q2 * q3), q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3) * 180.0f / PI;
+    float rollAtt = atan2(2.0f * (q0 * q1 + q2 * q3), q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3) * 180.0f / PI;
 
     // values for acceleration & rotation:
     float ax, ay, az;
     float gx, gy, gz;
-    static int count=0;  
+    static int count = 0;
 
     // read all 9 DOF of the IMU:
     IMU.readAcceleration(ax, ay, az);
@@ -145,7 +157,7 @@ void getRotationComplementaryFilter(float* att, unsigned long *lastUpdate){
     long now = micros();
     float alpha = 0.98; // default complementary filter coefficient
     float l = *lastUpdate;
-    float deltaT = ((now - l)/1000000.0f); // set integration time by time elapsed since last filter update
+    float deltaT = ((now - l) / 1000000.0f); // set integration time by time elapsed since last filter update
     *lastUpdate = now;
 
     // The complementary filter code is from NexgenAHRS. ref: https://bitbucket.org/David_Such/nexgen_ahrs/src/main/
@@ -166,7 +178,7 @@ void getRotationComplementaryFilter(float* att, unsigned long *lastUpdate){
     float _cosHalfPhi = cos(_halfPhi);
     float _sinHalfTheta = sin(_halfTheta);
     float _sinHalfPhi = sin(_halfPhi);
-    
+
     //  Calculate Attitude Quaternion
     //  ref: https://ahrs.readthedocs.io/en/latest/filters/complementary.html
     att[0] = att[0] - _halfdT * gx * att[1] - _halfdT * gy * att[2] - _halfdT * gz * att[3];
@@ -200,17 +212,17 @@ void getRotationComplementaryFilter(float* att, unsigned long *lastUpdate){
 
     count++;
     if (count > 20) // The optimum is probably something close to the refresh rate of your monitor.
-    {  
-        count = 0;  
+    {
+        count = 0;
 
-                // Convert to Euler angles:
-        float yawRadians   = atan2(2.0f * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3);   
+        // Convert to Euler angles:
+        float yawRadians = atan2(2.0f * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3);
         float pitchRadians = -asin(2.0f * (q1 * q3 - q0 * q2));
-        float rollRadians  = atan2(2.0f * (q0 * q1 + q2 * q3), q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3);
+        float rollRadians = atan2(2.0f * (q0 * q1 + q2 * q3), q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3);
 
         float pitch = pitchRadians * 180.0f / PI;
-        float eulerYaw   = yawRadians * 180.0f / PI; 
-        float roll  = rollRadians * 180.0f / PI;
+        float eulerYaw = yawRadians * 180.0f / PI;
+        float roll = rollRadians * 180.0f / PI;
 
         Serial.print(rollAtt);
         Serial.print('\t');
@@ -222,7 +234,7 @@ void getRotationComplementaryFilter(float* att, unsigned long *lastUpdate){
         Serial.print(*lastUpdate);
         Serial.print(']');
         Serial.print('\t');
-        Serial.print('>'); 
+        Serial.print('>');
 
         Serial.print(roll);
         Serial.print('\t');
@@ -252,6 +264,3 @@ void getRotationComplementaryFilter(float* att, unsigned long *lastUpdate){
         // Serial.println(_q3);
     }
 }
-
-
-
